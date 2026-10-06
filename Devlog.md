@@ -25,3 +25,9 @@ During this project, I became more comfortable using Raylib and C. I learned how
  I also developed a better understanding of how velocity, gravity and frame time work together to create consistent jumping and falling. When the fairy jumps, its vertical velocity moves it upwards while gravity is applied every frame until the fairy starts falling again. Frame time is used so that this movement stays more consistent across different frame rates.
 
 Another important thing I learned was how an API can be used as part of the actual gameplay rather than just displaying information. The weather API returns a weather code, which the game then uses to change the background and adjust the fairy's gravity depending on the conditions. Finally, I learned that creating a browser game involves additional steps such as using Emscripten to compile the game for the web and preloading assets so they can be accessed in the browser version.
+
+## Declaration / sources 
+
+- Gemini was used to create the code. 
+- [Itch fairy asset](https://papoycore.itch.io/fairy)
+- [Music](https://pixabay.com/music/search/fairy%20music/)
