@@ -4,6 +4,10 @@ Fairy sky glade is a micro platfrom game where you play as a fairy and collect o
 
 [Fairy sky glade Itch build](https://starcreations.itch.io/fairy-sky-glade)
 
+## GIF of final product 
+
+![Final game GIF](https://raw.githubusercontent.com/kdogz9/RaylibFairyGame/refs/heads/main/After.gif)
+
 ## API integregation
 
 This game uses real time weather data from the Open-Meteo forecast API. The live weather code changes the background of the game and impacts the air drag movement and gravity of the fairy.  

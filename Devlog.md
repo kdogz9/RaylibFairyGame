@@ -15,8 +15,13 @@ The overall idea was successfully implemented. The player can jump onto the plat
 
 However, during making the game I came across some issues such as the platforms generating above the screen which made it hard for the player to get the orb and see where they were. I had to adjust the code to add in boundaries so this stopped it from happening. I also had issues with the platforms generating either too close or too far from eachother so I had to find a mid ground point and debug this issue a lot. I also implemented my own assets from an artist and itch so the game wasn't being drawn as circles and sqaures to add character to it which meant preloading them into the emscripten build at the end so the browser could access them. 
 
+![Before GIF](https://raw.githubusercontent.com/kdogz9/RaylibFairyGame/refs/heads/main/Before.gif)
 
+*This is what the game looked like on Itch without successfully building the assets in the html files*
 
+![Final game GIf](https://raw.githubusercontent.com/kdogz9/RaylibFairyGame/refs/heads/main/After.gif)
+
+*This is what it looks like now with the assets successfully built in*
 
 ## Reflection (186 words)
 
