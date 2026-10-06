@@ -4,8 +4,9 @@
 *
 *   Features:
 *     - Auto-scaling window (compatible with 1080p, 720p, and high-DPI laptop displays)
-*     - Reachable dynamic progression: platforms always within natural jump range
-*     - Crisp, responsive jump physics with reliable platform clearance
+*     - Background Music Streaming (BackgroundMusic file integration with auto-loop)
+*     - Strict ceiling clamping: platforms NEVER spawn above top of screen
+*     - Non-overlapping platform layout validation with progressive difficulty
 *     - Custom textured assets (Fairy, Platform, Diamond, Star, Feather)
 *     - Non-duplicating active power-ups (Double Jump, Super Jump, Feather Soft-Landing)
 *     - Open-Meteo Weather integration + [L] key toggle
@@ -106,7 +107,11 @@ static Texture2D texDoubleJump;
 static Texture2D texSuperJump;
 static Texture2D texFeather;
 
-// Fairy Variables (Tuned for easy, natural clearance)
+// Background Music
+static Music bgMusic;
+static bool musicReady = false;
+
+// Fairy Variables
 static Vector2 fairyPos = { 960.0f, 850.0f };
 static Vector2 fairyVel = { 0.0f, 0.0f };
 static const float fairyRadius = 26.0f;
@@ -199,8 +204,34 @@ void FetchWeatherData(void) {
 #endif
 
 // =========================================================================================
-// SECTION 4: GUARANTEED REACHABLE PROCEDURAL GENERATOR
+// SECTION 4: PROCEDURAL GENERATOR (STRICT TOP CEILING BOUNDS)
 // =========================================================================================
+
+void TrySpawnPowerup(void) {
+    PowerupType availableTypes[3];
+    int availableCount = 0;
+
+    if (!hasDoubleJumpUnlocked)  availableTypes[availableCount++] = POWERUP_DOUBLE_JUMP;
+    if (!hasSuperJumpUnlocked)   availableTypes[availableCount++] = POWERUP_SUPER_JUMP;
+    if (!hasFeatherFallUnlocked) availableTypes[availableCount++] = POWERUP_FEATHER_FALL;
+
+    if (availableCount > 0) {
+        for (int i = 0; i < MAX_POWERUPS; i++) {
+            if (!powerups[i].active) {
+                powerups[i].active = true;
+                powerups[i].timer = 16.0f;
+                powerups[i].type = availableTypes[rand() % availableCount];
+
+                int platIdx = 1 + (rand() % (activePlatformCount - 1));
+                powerups[i].pos = (Vector2){ 
+                    platforms[platIdx].rect.x + (platforms[platIdx].rect.width * 0.5f), 
+                    platforms[platIdx].rect.y - 38.0f 
+                };
+                break;
+            }
+        }
+    }
+}
 
 void GenerateLevel(void) {
     hasDoubleJumpUnlocked = false;
@@ -221,51 +252,87 @@ void GenerateLevel(void) {
     if (activeOrbCount > MAX_ORBS) activeOrbCount = MAX_ORBS;
 
     // Platform 0: Ground Base
-    float baseWidth = 500.0f - (float)(currentLevel * 12);
-    if (baseWidth < 340.0f) baseWidth = 340.0f;
+    float baseWidth = 480.0f - (float)(currentLevel * 20);
+    if (baseWidth < 280.0f) baseWidth = 280.0f;
     platforms[0].rect = (Rectangle){ (screenWidth - baseWidth) * 0.5f, 960.0f, baseWidth, 26.0f };
     platforms[0].speedX = 0.0f;
     platforms[0].minX = 0.0f;
     platforms[0].maxX = (float)screenWidth;
 
-    // Early levels have short comfortable rises (110px), later levels rise up to 135px (jump reaches ~185px)
-    float verticalStep = 110.0f + (float)((currentLevel - 1) * 6);
-    if (verticalStep > 135.0f) verticalStep = 135.0f;
+    float lowestY = 960.0f;
+    float highestSafeY = 180.0f;
+    float totalVerticalSpan = lowestY - highestSafeY;
+    float verticalStep = totalVerticalSpan / (float)(activePlatformCount);
 
-    float currentY = 960.0f - verticalStep;
-    float currentCenterX = 960.0f;
+    if (verticalStep > 138.0f) verticalStep = 138.0f;
+    if (verticalStep < 110.0f) verticalStep = 110.0f;
+
+    float currentY = lowestY - verticalStep;
     int direction = (rand() % 2 == 0) ? 1 : -1;
 
     for (int i = 1; i < activePlatformCount; i++) {
-        float width = (float)(300 - (currentLevel * 12) + (rand() % 20));
-        if (width < 180.0f) width = 180.0f;
+        float width = (float)(300 - (currentLevel * 22) + (rand() % 20));
+        if (width < 140.0f) width = 140.0f;
 
-        // Realistic horizontal distance easy to cross with normal jump
-        float stepDist = 200.0f + (float)(rand() % 130);
-        float nextCenterX = currentCenterX + (direction * stepDist);
+        float platX = 0.0f;
+        bool validPosition = false;
+        int attempts = 0;
 
-        if (nextCenterX > (float)screenWidth - 250.0f) {
-            nextCenterX = currentCenterX - stepDist;
-            direction = -1;
-        } else if (nextCenterX < 250.0f) {
-            nextCenterX = currentCenterX + stepDist;
-            direction = 1;
-        } else {
-            if (rand() % 10 < 7) direction = -direction;
+        while (!validPosition && attempts < 100) {
+            attempts++;
+
+            float stepDist = 240.0f + (float)(rand() % 160);
+            float prevCenterX = platforms[i - 1].rect.x + (platforms[i - 1].rect.width * 0.5f);
+            float nextCenterX = prevCenterX + (direction * stepDist);
+
+            if (nextCenterX > (float)screenWidth - 240.0f) {
+                direction = -1;
+                nextCenterX = prevCenterX + (direction * stepDist);
+            } else if (nextCenterX < 240.0f) {
+                direction = 1;
+                nextCenterX = prevCenterX + (direction * stepDist);
+            }
+
+            platX = nextCenterX - (width * 0.5f);
+            Rectangle candidateRec = { platX, currentY, width, 24.0f };
+
+            bool overlaps = false;
+            for (int j = 0; j < i; j++) {
+                Rectangle expandedCheck = {
+                    candidateRec.x - 60.0f,
+                    candidateRec.y - 80.0f,
+                    candidateRec.width + 120.0f,
+                    candidateRec.height + 160.0f
+                };
+
+                if (CheckCollisionRecs(expandedCheck, platforms[j].rect)) {
+                    overlaps = true;
+                    break;
+                }
+            }
+
+            if (!overlaps) {
+                validPosition = true;
+            } else {
+                direction = -direction;
+            }
         }
 
-        float platX = nextCenterX - (width * 0.5f);
+        if (!validPosition) {
+            platX = (direction == 1) ? (float)(screenWidth - 350) : 200.0f;
+        }
+
         platforms[i].rect = (Rectangle){ platX, currentY, width, 24.0f };
 
-        float speed = (float)(55 + (rand() % 25) + (currentLevel * 10));
+        float speed = (float)(50 + (rand() % 25) + (currentLevel * 14));
         platforms[i].speedX = (rand() % 2 == 0) ? speed : -speed;
 
-        float sweep = (float)(60 + (rand() % 35));
-        platforms[i].minX = (platX - sweep < 50.0f) ? 50.0f : platX - sweep;
-        platforms[i].maxX = (platX + width + sweep > (float)screenWidth - 50.0f) 
-                            ? (float)screenWidth - 50.0f : platX + width + sweep;
+        float sweep = (float)(50 + (rand() % 30) + (currentLevel * 5));
+        platforms[i].minX = (platX - sweep < 40.0f) ? 40.0f : platX - sweep;
+        platforms[i].maxX = (platX + width + sweep > (float)screenWidth - 40.0f) 
+                            ? (float)screenWidth - 40.0f : platX + width + sweep;
 
-        currentCenterX = nextCenterX;
+        direction = -direction;
         currentY -= verticalStep;
     }
 
@@ -279,6 +346,8 @@ void GenerateLevel(void) {
         };
         orbs[i].collected = false;
     }
+
+    TrySpawnPowerup();
 }
 
 void InitOrResetGame(void) {
@@ -292,6 +361,11 @@ void InitOrResetGame(void) {
         raindrops[i].speed = (float)(400 + rand() % 300);
     }
 
+    if (musicReady) {
+        SeekMusicStream(bgMusic, 0.0f);
+        if (!IsMusicStreamPlaying(bgMusic)) PlayMusicStream(bgMusic);
+    }
+
     GenerateLevel();
     currentState = STATE_PLAY;
 }
@@ -303,6 +377,11 @@ void InitOrResetGame(void) {
 void UpdateDrawFrame(void) {
     float dt = GetFrameTime();
     if (dt > 0.05f) dt = 0.05f;
+
+    // Stream background music buffer continuously
+    if (musicReady) {
+        UpdateMusicStream(bgMusic);
+    }
 
     if (IsKeyPressed(KEY_L)) {
         if (currentWeather == WEATHER_CLEAR) ApplyWeather(WEATHER_CLOUDY);
@@ -338,7 +417,7 @@ void UpdateDrawFrame(void) {
             }
         }
 
-        // --- 3. Jump Strength (Super Jump gives higher reach) ---
+        // --- 3. Jump Strength ---
         jumpStrength = hasSuperJumpUnlocked ? -800.0f : -640.0f;
 
         // --- 4. Horizontal Input & Screen Wrapping ---
@@ -346,7 +425,7 @@ void UpdateDrawFrame(void) {
         if (IsKeyDown(KEY_LEFT) || IsKeyDown(KEY_A)) moveX -= 1.0f;
         if (IsKeyDown(KEY_RIGHT) || IsKeyDown(KEY_D)) moveX += 1.0f;
 
-        float nextPosX = fairyPos.x + (moveX * 420.0f * dt);
+        float nextPosX = fairyPos.x + (moveX * 430.0f * dt);
 
         if (nextPosX < 0) nextPosX = (float)screenWidth;
         if (nextPosX > (float)screenWidth) nextPosX = 0;
@@ -433,31 +512,11 @@ void UpdateDrawFrame(void) {
             GenerateLevel();
         }
 
-        // --- 8. Power-up Spawn Logic ---
+        // --- 8. Power-up Spawn Timer ---
         powerupSpawnTimer += dt;
-        if (powerupSpawnTimer > 6.0f) {
+        if (powerupSpawnTimer > 5.0f) {
             powerupSpawnTimer = 0.0f;
-
-            PowerupType availableTypes[3];
-            int availableCount = 0;
-
-            if (!hasDoubleJumpUnlocked)  availableTypes[availableCount++] = POWERUP_DOUBLE_JUMP;
-            if (!hasSuperJumpUnlocked)   availableTypes[availableCount++] = POWERUP_SUPER_JUMP;
-            if (!hasFeatherFallUnlocked) availableTypes[availableCount++] = POWERUP_FEATHER_FALL;
-
-            if (availableCount > 0) {
-                for (int i = 0; i < MAX_POWERUPS; i++) {
-                    if (!powerups[i].active) {
-                        powerups[i].active = true;
-                        powerups[i].timer = 14.0f;
-                        powerups[i].type = availableTypes[rand() % availableCount];
-
-                        int platIdx = 1 + (rand() % (activePlatformCount - 1));
-                        powerups[i].pos = (Vector2){ platforms[platIdx].rect.x + (platforms[platIdx].rect.width * 0.5f), platforms[platIdx].rect.y - 38.0f };
-                        break;
-                    }
-                }
-            }
+            TrySpawnPowerup();
         }
 
         // --- 9. Collect Power-ups ---
@@ -649,14 +708,29 @@ int main(void) {
     InitWindow(1280, 720, "Fairy Sky Glade");
     SetTargetFPS(60);
 
+    // Audio System Setup
+    InitAudioDevice();
+
     target = LoadRenderTexture(screenWidth, screenHeight);
     SetTextureFilter(target.texture, TEXTURE_FILTER_BILINEAR);
 
+    // Textures
     fairyTexture    = LoadTexture("fairy.png");
     platformTexture = LoadTexture("Platform.png");
     texDoubleJump   = LoadTexture("Diamond.png");
     texSuperJump    = LoadTexture("Star.png");
     texFeather      = LoadTexture("Feather.png");
+
+    // Load Background Music Stream
+   
+    if (bgMusic.stream.buffer == NULL) bgMusic = LoadMusicStream("BackgroundMusic.mp3");
+    
+
+    if (bgMusic.stream.buffer != NULL) {
+        musicReady = true;
+        PlayMusicStream(bgMusic);
+        SetMusicVolume(bgMusic, 0.65f);
+    }
 
 #if defined(PLATFORM_WEB)
     FetchWeatherData();
@@ -679,6 +753,10 @@ int main(void) {
     if (texDoubleJump.id > 0)   UnloadTexture(texDoubleJump);
     if (texSuperJump.id > 0)    UnloadTexture(texSuperJump);
     if (texFeather.id > 0)      UnloadTexture(texFeather);
+
+    if (musicReady) UnloadMusicStream(bgMusic);
+    CloseAudioDevice();
+
     CloseWindow();
 #endif
 
