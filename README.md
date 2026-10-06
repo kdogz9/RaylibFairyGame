@@ -2,6 +2,8 @@
 
 Fairy sky glade is a micro platfrom game where you play as a fairy and collect orbs on moving platforms to move to the next level. There are powerups which provide jump boosts and feather falling to help make the game easier and each level gets progressively harder. 
 
+[Fairy sky glade Itch build](https://starcreations.itch.io/fairy-sky-glade)
+
 ## API integregation
 
 This game uses real time weather data from the Open-Meteo forecast API. The live weather code changes the background of the game and impacts the air drag movement and gravity of the fairy.  
