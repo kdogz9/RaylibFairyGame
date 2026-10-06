@@ -13,7 +13,9 @@ As part of the requirement I decided to use a weather API to change the backgrou
 
 The overall idea was successfully implemented. The player can jump onto the platforms and not go through them, they can collect the orbs which sends them to the next level and they can collect 3 different powerups which affects their jump height or adds feather falling to keep them in the sky longer. You can also manually change the weather background pressing the `L` key so players don't have to wait for it to change in real time. There is also background music that loops. 
 
-However, during making the game I came across some issues such as the platforms generating above the screen which made it hard for the player to get the orb and see where they were. I had to adjust the code to add in boundaries so this stopped it from happening. I also had issues with the platforms generating either too close or too far from eachother so I had to find a mid ground point and debug this issue a lot. I also implemented my own assets from an artist and itch so the game wasn't being drawn to add character to it which meant preloading them into the emscripten build at the end so the browser could access them. 
+However, during making the game I came across some issues such as the platforms generating above the screen which made it hard for the player to get the orb and see where they were. I had to adjust the code to add in boundaries so this stopped it from happening. I also had issues with the platforms generating either too close or too far from eachother so I had to find a mid ground point and debug this issue a lot. I also implemented my own assets from an artist and itch so the game wasn't being drawn as circles and sqaures to add character to it which meant preloading them into the emscripten build at the end so the browser could access them. 
+
+
 
 
 ## Reflection (186 words)
