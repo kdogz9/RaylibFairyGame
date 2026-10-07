@@ -51,7 +51,7 @@ emcc -o index.html src/raylib_game.c -Os -Wall \
 
 ## How to serve and play in a browser 
 
-After the game has been compiled, download `Python` and run this line in the terminal: 
+After the game has been compiled, download `Python` and open the terminal in the folder where your index files have been stored. Then run this command:
 
 ```
 Bash 
