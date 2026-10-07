@@ -5,6 +5,7 @@
 *   Features:
 *     - Auto-scaling window (compatible with 1080p, 720p, and high-DPI laptop displays)
 *     - Background Music Streaming (BackgroundMusic file integration with auto-loop)
+*     - Sound Effects integration for Orbs and Power-ups
 *     - Strict ceiling clamping: platforms NEVER spawn above top of screen
 *     - Non-overlapping platform layout validation with progressive difficulty
 *     - Custom textured assets (Fairy, Platform, Diamond, Star, Feather)
@@ -107,9 +108,15 @@ static Texture2D texDoubleJump;
 static Texture2D texSuperJump;
 static Texture2D texFeather;
 
-// Background Music
+// Background Music & Sound Effects
 static Music bgMusic;
 static bool musicReady = false;
+
+static Sound orbSound;
+static bool orbSoundReady = false;
+
+static Sound pickupSound;
+static bool pickupSoundReady = false;
 
 // Fairy Variables
 static Vector2 fairyPos = { 960.0f, 850.0f };
@@ -204,7 +211,7 @@ void FetchWeatherData(void) {
 #endif
 
 // =========================================================================================
-// SECTION 4: PROCEDURAL GENERATOR (STRICT TOP CEILING BOUNDS)
+// SECTION 4: PROCEDURAL GENERATOR
 // =========================================================================================
 
 void TrySpawnPowerup(void) {
@@ -378,7 +385,6 @@ void UpdateDrawFrame(void) {
     float dt = GetFrameTime();
     if (dt > 0.05f) dt = 0.05f;
 
-    // Stream background music buffer continuously
     if (musicReady) {
         UpdateMusicStream(bgMusic);
     }
@@ -498,6 +504,9 @@ void UpdateDrawFrame(void) {
                 if (CheckCollisionCircles(fairyPos, fairyRadius, orbs[i].pos, 24.0f)) {
                     orbs[i].collected = true;
                     score += 100;
+                    
+                    // Play Orb Sound Effect
+                    if (orbSoundReady) PlaySound(orbSound);
                 } else {
                     allCollected = false;
                 }
@@ -536,6 +545,9 @@ void UpdateDrawFrame(void) {
                     }
                     score += 50;
                     powerups[i].active = false;
+
+                    // Play Powerup Sound Effect
+                    if (pickupSoundReady) PlaySound(pickupSound);
                 }
             }
         }
@@ -643,7 +655,7 @@ void UpdateDrawFrame(void) {
             DrawCircleLines((int)fairyPos.x, (int)fairyPos.y, fairyRadius + 5.0f, PINK);
         }
 
-        // Render Fairy (96x96 pixels)
+        // Render Fairy
         if (fairyTexture.id > 0) {
             Rectangle sourceRec = { 0.0f, 0.0f, (float)fairyTexture.width, (float)fairyTexture.height };
             Rectangle destRec = { fairyPos.x, fairyPos.y, 96.0f, 96.0f };
@@ -722,14 +734,24 @@ int main(void) {
     texFeather      = LoadTexture("Feather.png");
 
     // Load Background Music Stream
-   
-    if (bgMusic.stream.buffer == NULL) bgMusic = LoadMusicStream("BackgroundMusic.mp3");
-    
-
+    bgMusic = LoadMusicStream("BackgroundMusic.mp3");
     if (bgMusic.stream.buffer != NULL) {
         musicReady = true;
         PlayMusicStream(bgMusic);
         SetMusicVolume(bgMusic, 0.65f);
+    }
+
+    // Load Sound Effects
+    orbSound = LoadSound("Orb.mp3");
+    if (orbSound.stream.buffer != NULL) {
+        orbSoundReady = true;
+        SetSoundVolume(orbSound, 0.8f);
+    }
+
+    pickupSound = LoadSound("PickUp.mp3");
+    if (pickupSound.stream.buffer != NULL) {
+        pickupSoundReady = true;
+        SetSoundVolume(pickupSound, 0.8f);
     }
 
 #if defined(PLATFORM_WEB)
@@ -755,8 +777,10 @@ int main(void) {
     if (texFeather.id > 0)      UnloadTexture(texFeather);
 
     if (musicReady) UnloadMusicStream(bgMusic);
-    CloseAudioDevice();
+    if (orbSoundReady) UnloadSound(orbSound);
+    if (pickupSoundReady) UnloadSound(pickupSound);
 
+    CloseAudioDevice();
     CloseWindow();
 #endif
 
